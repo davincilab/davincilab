@@ -632,6 +632,38 @@ table.data td.num, table.data th.num { text-align: right; font-variant-numeric: 
   .sheet { border-radius: var(--radius-lg); max-height: 86vh; }
 }
 
+/* ---------- flow hosts (in-app file viewers) ----------
+   The host grew the frame to the whole document and scrolls it from outside,
+   so nothing here may rely on its own scrollbar or on a fixed viewport. */
+
+body.is-flowhost .topbar,
+body.is-flowhost .chips { position: static; }
+
+body.is-flowhost .cartbar {
+  position: static;
+  transform: none;
+  backdrop-filter: none;
+  margin-top: 20px;
+}
+
+body.is-flowhost .main--guest { padding-bottom: 16px; }
+
+.sheet-backdrop--inline {
+  position: static;
+  background: none;
+  display: block;
+  opacity: 1;
+}
+.sheet-backdrop--inline .sheet {
+  max-width: none;
+  max-height: none;
+  border-radius: 0;
+  transform: none;
+  box-shadow: none;
+}
+.sheet-backdrop--inline .sheet__body { overflow: visible; }
+.sheet-backdrop--inline .sheet__head { position: static; }
+
 /* ---------- toast ---------- */
 
 .toast-host {
@@ -1832,6 +1864,27 @@ table.data td.num, table.data th.num { text-align: right; font-variant-numeric: 
 
   function statusLabel(status) { return t('status_' + status); }
 
+  // --- host detection ------------------------------------------------------
+
+  /* Some in-app file viewers do not give the page its own viewport: they grow
+     the frame to the full document height and scroll it from the outside. A
+     window taller than the physical screen gives that away. In such a host
+     nothing inside the page can scroll on its own, so overlays with their own
+     scrollbar would be unreachable below the fold — we lay them out in the
+     document flow instead. Re-checked on demand, because the host resizes the
+     frame only after content has rendered. */
+  function isFlowHost() {
+    var framed = true;
+    try { framed = global.top !== global.self; } catch (err) { framed = true; }
+    if (!framed) return false;
+    var screenHeight = (global.screen && global.screen.height) || 0;
+    return screenHeight > 0 && global.innerHeight > screenHeight * 1.2;
+  }
+
+  function markHost() {
+    if (document.body) document.body.classList.toggle('is-flowhost', isFlowHost());
+  }
+
   // --- toast ---------------------------------------------------------------
 
   var toastHost = null;
@@ -1849,7 +1902,8 @@ table.data td.num, table.data th.num { text-align: right; font-variant-numeric: 
   // --- sheet / modal -------------------------------------------------------
 
   function sheet(options) {
-    var backdrop = el('div.sheet-backdrop');
+    var inline = isFlowHost();
+    var backdrop = el('div.sheet-backdrop' + (inline ? '.sheet-backdrop--inline' : ''));
     var panel = el('div.sheet' + (options.wide ? '.sheet--wide' : ''), {
       role: 'dialog', 'aria-modal': 'true', 'aria-label': options.title || ''
     });
@@ -1869,15 +1923,27 @@ table.data td.num, table.data th.num { text-align: right; font-variant-numeric: 
     });
     document.addEventListener('keydown', onKey);
     document.body.appendChild(backdrop);
-    document.body.classList.add('is-locked');
-    requestAnimationFrame(function () { backdrop.classList.add('is-open'); });
+
+    /* In a flow host the page underneath is hidden while the panel is open:
+       the document then ends with the panel, the outer scroll snaps back to
+       the top and every field down to the footer is reachable. */
+    var app = document.querySelector('.app');
+    if (inline) {
+      if (app) app.style.display = 'none';
+      backdrop.classList.add('is-open');
+      global.scrollTo(0, 0);
+    } else {
+      document.body.classList.add('is-locked');
+      requestAnimationFrame(function () { backdrop.classList.add('is-open'); });
+    }
 
     function onKey(event) { if (event.key === 'Escape') close(); }
     function close() {
       document.removeEventListener('keydown', onKey);
       backdrop.classList.remove('is-open');
       document.body.classList.remove('is-locked');
-      setTimeout(function () { backdrop.remove(); }, 200);
+      if (inline && app) app.style.display = '';
+      setTimeout(function () { backdrop.remove(); }, inline ? 0 : 200);
       if (options.onClose) options.onClose();
     }
 
@@ -1919,7 +1985,15 @@ table.data td.num, table.data th.num { text-align: right; font-variant-numeric: 
     return wrap;
   }
 
-  function applyLang() { document.documentElement.lang = lang(); }
+  function applyLang() {
+    document.documentElement.lang = lang();
+    markHost();
+  }
+
+  // the frame is sized after content renders, so re-check when it changes
+  global.addEventListener('resize', markHost);
+  setTimeout(markHost, 400);
+  setTimeout(markHost, 1500);
 
   // --- sound (bar station) -------------------------------------------------
 
@@ -1980,7 +2054,7 @@ table.data td.num, table.data th.num { text-align: right; font-variant-numeric: 
     langToggle: langToggle, applyLang: applyLang,
     beep: beep, param: param, debounce: debounce, escapeHtml: escapeHtml,
     single: SINGLE, roleName: roleName, route: route, go: go,
-    hash: hash, setHash: setHash
+    hash: hash, setHash: setHash, isFlowHost: isFlowHost, markHost: markHost
   };
 })(typeof window !== 'undefined' ? window : globalThis);
 

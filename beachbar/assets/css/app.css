@@ -618,6 +618,38 @@ table.data td.num, table.data th.num { text-align: right; font-variant-numeric: 
   .sheet { border-radius: var(--radius-lg); max-height: 86vh; }
 }
 
+/* ---------- flow hosts (in-app file viewers) ----------
+   The host grew the frame to the whole document and scrolls it from outside,
+   so nothing here may rely on its own scrollbar or on a fixed viewport. */
+
+body.is-flowhost .topbar,
+body.is-flowhost .chips { position: static; }
+
+body.is-flowhost .cartbar {
+  position: static;
+  transform: none;
+  backdrop-filter: none;
+  margin-top: 20px;
+}
+
+body.is-flowhost .main--guest { padding-bottom: 16px; }
+
+.sheet-backdrop--inline {
+  position: static;
+  background: none;
+  display: block;
+  opacity: 1;
+}
+.sheet-backdrop--inline .sheet {
+  max-width: none;
+  max-height: none;
+  border-radius: 0;
+  transform: none;
+  box-shadow: none;
+}
+.sheet-backdrop--inline .sheet__body { overflow: visible; }
+.sheet-backdrop--inline .sheet__head { position: static; }
+
 /* ---------- toast ---------- */
 
 .toast-host {

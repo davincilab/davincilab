@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Umbrella QR codes</title>
+<meta name="description" content="Print the numbered QR codes for every umbrella.">
+<meta name="theme-color" content="#2a78d6">
+<link rel="icon" href="assets/icons/icon-guest-32.png" sizes="32x32">
+<link rel="stylesheet" href="assets/css/app.css">
+</head>
+<body data-app="guest">
+<div class="app">
+  <header class="topbar no-print">
+    <a class="icon-btn" href="index.html" aria-label="Start" style="text-decoration:none">←</a>
+    <div style="flex:1;min-width:0">
+      <div class="topbar__title">QR codes</div>
+      <div class="topbar__sub" id="topSub">One code per umbrella</div>
+    </div>
+    <div id="langHost"></div>
+  </header>
+  <main class="main" id="view"></main>
+</div>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/store.js"></script>
+<script src="assets/js/ui.js"></script>
+<script src="assets/js/qrcode.js"></script>
+<script src="assets/js/qr.js"></script>
+</body>
+</html>

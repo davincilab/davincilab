@@ -12,7 +12,18 @@
   var el = UI.el, t = UI.t;
   var view = UI.$('#view');
 
+  /* Codes have to carry an address a phone camera can actually open. Opened
+     from a file viewer or a blob the page has no such address (about:blank,
+     blob:, file:), so we offer a placeholder to overwrite instead of baking
+     nonsense into 40 printed labels. */
+  var PLACEHOLDER = 'https://beachbar.example.com';
+
+  function hostIsAddressable() {
+    return location.protocol === 'http:' || location.protocol === 'https:';
+  }
+
   function defaultBase() {
+    if (!hostIsAddressable()) return PLACEHOLDER;
     // single file: the page itself is the app; pages: the folder holding them
     if (UI.single) return location.href.split('#')[0];
     return location.href.replace(/[^/]*$/, '').replace(/\/$/, '');
@@ -66,6 +77,11 @@
         el('p.small.muted', { text: UI.lang() === 'el'
           ? 'Ο κωδικός ανοίγει την εφαρμογή με τον αριθμό της ομπρέλας.'
           : 'Each code opens the guest app with its umbrella number pre-selected.' }),
+        hostIsAddressable() ? null : el('div.notice.notice--warn', { text: UI.lang() === 'el'
+          ? 'Η σελίδα δεν έχει διεύθυνση που μπορεί να σαρωθεί. Γράψτε τη διεύθυνση '
+            + 'στην οποία θα φιλοξενηθεί η εφαρμογή.'
+          : 'This page has no scannable address of its own. Enter the address the '
+            + 'app will be hosted at, otherwise the codes lead nowhere.' }),
         el('div.field', {}, [
           el('label.field__label', { text: 'Base URL' }),
           (baseInput = el('input', { type: 'text', value: base,

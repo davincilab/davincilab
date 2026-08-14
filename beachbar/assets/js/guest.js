@@ -23,10 +23,10 @@
   // --- cart persistence ----------------------------------------------------
 
   function loadCart() {
-    try { return JSON.parse(localStorage.getItem(CART_KEY)) || []; } catch (e) { return []; }
+    try { return JSON.parse(Store.storage.getItem(CART_KEY)) || []; } catch (e) { return []; }
   }
   function saveCart() {
-    localStorage.setItem(CART_KEY, JSON.stringify(cart));
+    Store.storage.setItem(CART_KEY, JSON.stringify(cart));
     renderCartBar();
   }
   function addToCart(line) {
@@ -73,6 +73,7 @@
           }
           Store.saveDevice({ umbrella: n });
           ref.close();
+          renderShell();   // the badge in the header shows the number too
           render();
         }
       })]

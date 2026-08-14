@@ -46,11 +46,30 @@
   var state = null;
   var device = null;
 
+  /* localStorage is unavailable in sandboxed previews, private-mode quirks and
+     some in-app file viewers — there we keep everything in memory instead, so
+     the app runs (just without remembering anything between reloads). */
+  var storage = (function () {
+    try {
+      var probe = 'bb.probe';
+      localStorage.setItem(probe, '1');
+      localStorage.removeItem(probe);
+      return localStorage;
+    } catch (err) {
+      var memory = {};
+      return {
+        getItem: function (key) { return key in memory ? memory[key] : null; },
+        setItem: function (key, value) { memory[key] = String(value); },
+        removeItem: function (key) { delete memory[key]; }
+      };
+    }
+  })();
+
   function clone(value) { return JSON.parse(JSON.stringify(value)); }
 
   function readJSON(key, fallback) {
     try {
-      var raw = localStorage.getItem(key);
+      var raw = storage.getItem(key);
       if (!raw) return clone(fallback);
       var parsed = JSON.parse(raw);
       return Object.assign(clone(fallback), parsed);
@@ -62,7 +81,7 @@
 
   function writeJSON(key, value) {
     try {
-      localStorage.setItem(key, JSON.stringify(value));
+      storage.setItem(key, JSON.stringify(value));
     } catch (err) {
       console.warn('store: could not write', key, err);
     }
@@ -87,8 +106,12 @@
       device.lang = (navigator.language || 'en').toLowerCase().indexOf('el') === 0 ? 'el' : 'en';
       writeJSON(DEVICE_KEY, device);
     }
-    if (typeof BroadcastChannel !== 'undefined') {
-      channel = new BroadcastChannel(CHANNEL);
+    try {
+      channel = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel(CHANNEL) : null;
+    } catch (err) {
+      channel = null;   // blocked in opaque origins; single-window still works
+    }
+    if (channel) {
       channel.onmessage = function (event) {
         if (event.data && event.data.type === 'state') {
           state = readJSON(STATE_KEY, DEFAULT_STATE);
@@ -463,6 +486,7 @@
     setMusicStatus: setMusicStatus,
     sendInvoice: sendInvoice,
     seedDemo: seedDemo,
-    resetAll: resetAll
+    resetAll: resetAll,
+    storage: storage
   };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -1219,11 +1219,30 @@ table.data td.num, table.data th.num { text-align: right; font-variant-numeric: 
   var state = null;
   var device = null;
 
+  /* localStorage is unavailable in sandboxed previews, private-mode quirks and
+     some in-app file viewers — there we keep everything in memory instead, so
+     the app runs (just without remembering anything between reloads). */
+  var storage = (function () {
+    try {
+      var probe = 'bb.probe';
+      localStorage.setItem(probe, '1');
+      localStorage.removeItem(probe);
+      return localStorage;
+    } catch (err) {
+      var memory = {};
+      return {
+        getItem: function (key) { return key in memory ? memory[key] : null; },
+        setItem: function (key, value) { memory[key] = String(value); },
+        removeItem: function (key) { delete memory[key]; }
+      };
+    }
+  })();
+
   function clone(value) { return JSON.parse(JSON.stringify(value)); }
 
   function readJSON(key, fallback) {
     try {
-      var raw = localStorage.getItem(key);
+      var raw = storage.getItem(key);
       if (!raw) return clone(fallback);
       var parsed = JSON.parse(raw);
       return Object.assign(clone(fallback), parsed);
@@ -1235,7 +1254,7 @@ table.data td.num, table.data th.num { text-align: right; font-variant-numeric: 
 
   function writeJSON(key, value) {
     try {
-      localStorage.setItem(key, JSON.stringify(value));
+      storage.setItem(key, JSON.stringify(value));
     } catch (err) {
       console.warn('store: could not write', key, err);
     }
@@ -1260,8 +1279,12 @@ table.data td.num, table.data th.num { text-align: right; font-variant-numeric: 
       device.lang = (navigator.language || 'en').toLowerCase().indexOf('el') === 0 ? 'el' : 'en';
       writeJSON(DEVICE_KEY, device);
     }
-    if (typeof BroadcastChannel !== 'undefined') {
-      channel = new BroadcastChannel(CHANNEL);
+    try {
+      channel = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel(CHANNEL) : null;
+    } catch (err) {
+      channel = null;   // blocked in opaque origins; single-window still works
+    }
+    if (channel) {
       channel.onmessage = function (event) {
         if (event.data && event.data.type === 'state') {
           state = readJSON(STATE_KEY, DEFAULT_STATE);
@@ -1636,7 +1659,8 @@ table.data td.num, table.data th.num { text-align: right; font-variant-numeric: 
     setMusicStatus: setMusicStatus,
     sendInvoice: sendInvoice,
     seedDemo: seedDemo,
-    resetAll: resetAll
+    resetAll: resetAll,
+    storage: storage
   };
 })(typeof window !== 'undefined' ? window : globalThis);
 
@@ -1655,22 +1679,48 @@ table.data td.num, table.data th.num { text-align: right; font-variant-numeric: 
      multi-page  ?u=12            single-file  #guest?u=12                    */
   var SINGLE = !!global.BB_SINGLE_FILE;
 
+  /* Some hosts (in-app file viewers, sandboxed previews) refuse fragment
+     navigation. When we notice the address bar did not take our hash, we keep
+     it in memory instead and raise the event ourselves, so routing keeps
+     working wherever the file is opened. */
+  var virtualHash = null;
+
+  function hash() {
+    return virtualHash != null ? virtualHash : location.hash;
+  }
+
+  function setHash(next) {
+    if (virtualHash == null) {
+      try { location.hash = next; } catch (err) { /* blocked */ }
+      if (location.hash === next || location.hash === '#' + next.replace(/^#/, '')) return;
+    }
+    virtualHash = next;
+    var event;
+    try {
+      event = new HashChangeEvent('hashchange');
+    } catch (err) {
+      event = document.createEvent('Event');
+      event.initEvent('hashchange', false, false);
+    }
+    global.dispatchEvent(event);
+  }
+
   function roleName() {
-    return SINGLE ? (location.hash.replace(/^#/, '').split(/[/?]/)[0] || 'index') : '';
+    return SINGLE ? (hash().replace(/^#/, '').split(/[/?]/)[0] || 'index') : '';
   }
 
   /* the route inside the current app, without role prefix and query */
   function route() {
-    var hash = location.hash.replace(/^#/, '');
-    var query = hash.indexOf('?');
-    if (query >= 0) hash = hash.slice(0, query);
-    if (!SINGLE) return hash;
-    var slash = hash.indexOf('/');
-    return slash < 0 ? '' : hash.slice(slash + 1);
+    var h = hash().replace(/^#/, '');
+    var query = h.indexOf('?');
+    if (query >= 0) h = h.slice(0, query);
+    if (!SINGLE) return h;
+    var slash = h.indexOf('/');
+    return slash < 0 ? '' : h.slice(slash + 1);
   }
 
   function go(sub) {
-    location.hash = SINGLE ? '#' + roleName() + '/' + (sub || 'menu') : '#' + (sub || 'menu');
+    setHash(SINGLE ? '#' + roleName() + '/' + (sub || 'menu') : '#' + (sub || 'menu'));
   }
 
   function lang() { return Store.device.lang || 'en'; }
@@ -1885,9 +1935,9 @@ table.data td.num, table.data th.num { text-align: right; font-variant-numeric: 
   function param(name) {
     var fromSearch = new URLSearchParams(location.search).get(name);
     if (fromSearch != null) return fromSearch;
-    var hash = location.hash || '';
-    var query = hash.indexOf('?');
-    return query < 0 ? null : new URLSearchParams(hash.slice(query + 1)).get(name);
+    var h = hash() || '';
+    var query = h.indexOf('?');
+    return query < 0 ? null : new URLSearchParams(h.slice(query + 1)).get(name);
   }
 
   function debounce(fn, wait) {
@@ -1913,7 +1963,8 @@ table.data td.num, table.data th.num { text-align: right; font-variant-numeric: 
     toast: toast, sheet: sheet, confirmSheet: confirmSheet,
     langToggle: langToggle, applyLang: applyLang,
     beep: beep, param: param, debounce: debounce, escapeHtml: escapeHtml,
-    single: SINGLE, roleName: roleName, route: route, go: go
+    single: SINGLE, roleName: roleName, route: route, go: go,
+    hash: hash, setHash: setHash
   };
 })(typeof window !== 'undefined' ? window : globalThis);
 
@@ -2339,10 +2390,10 @@ window.BB_MODULES['guest'] = function () {
   // --- cart persistence ----------------------------------------------------
 
   function loadCart() {
-    try { return JSON.parse(localStorage.getItem(CART_KEY)) || []; } catch (e) { return []; }
+    try { return JSON.parse(Store.storage.getItem(CART_KEY)) || []; } catch (e) { return []; }
   }
   function saveCart() {
-    localStorage.setItem(CART_KEY, JSON.stringify(cart));
+    Store.storage.setItem(CART_KEY, JSON.stringify(cart));
     renderCartBar();
   }
   function addToCart(line) {
@@ -4092,7 +4143,7 @@ window.BB_MODULES['qr'] = function () {
     return location.href.replace(/[^/]*$/, '').replace(/\/$/, '');
   }
 
-  var base = localStorage.getItem('bb.qrbase') || defaultBase();
+  var base = Store.storage.getItem('bb.qrbase') || defaultBase();
   var from = 1;
   var to = Store.settings.umbrellaCount;
 
@@ -4160,7 +4211,7 @@ window.BB_MODULES['qr'] = function () {
             type: 'button', text: UI.lang() === 'el' ? 'Δημιουργία' : 'Generate',
             onclick: function () {
               base = baseInput.value.trim() || defaultBase();
-              localStorage.setItem('bb.qrbase', base);
+              Store.storage.setItem('bb.qrbase', base);
               from = Math.max(1, Number(fromInput.value) || 1);
               to = Math.max(from, Math.min(200, Number(toInput.value) || from));
               refreshGrid();
@@ -4188,29 +4239,74 @@ window.BB_MODULES['qr'] = function () {
 };
 </script>
 <script>
-/* router: one role per page load — switching roles reloads, so every app boots
-   exactly like it does in the multi-page build */
+/* Router. Roles are swapped in place — never by reloading: in-app file viewers
+   and sandboxed previews block reloads, and a demo that dies on the first tap
+   is worse than useless. Each role's intervals, window listeners and store
+   subscriptions are tracked while it boots, so switching away disposes of them
+   and the next role starts as cleanly as it would on a fresh page. */
 (function () {
   var ROLES = ["index", "guest", "bar", "dashboard", "qr"];
-  function currentRole() {
-    var role = (location.hash || '').replace(/^#/, '').split(/[\/?]/)[0];
+
+  function roleFrom(hash) {
+    var role = (hash || '').replace(/^#/, '').split(/[\/?]/)[0];
     return ROLES.indexOf(role) >= 0 ? role : 'index';
   }
-  var booted = currentRole();
 
-  function boot() {
-    var role = booted;
+  var booted = null;
+  var disposers = [];
+
+  function onHashChange() {
+    var next = roleFrom(UI.hash());
+    if (next !== booted) boot(next);
+  }
+  window.addEventListener('hashchange', onHashChange);
+
+  // from here on, everything a role registers is disposable
+  var nativeSetInterval = window.setInterval;
+  window.setInterval = function (fn, ms) {
+    var id = nativeSetInterval(fn, ms);
+    disposers.push(function () { clearInterval(id); });
+    return id;
+  };
+  var nativeAddListener = window.addEventListener;
+  window.addEventListener = function (type, fn, options) {
+    nativeAddListener.call(window, type, fn, options);
+    disposers.push(function () { window.removeEventListener(type, fn, options); });
+  };
+  var nativeSubscribe = Store.subscribe;
+  Store.subscribe = function (fn) {
+    var off = nativeSubscribe(fn);
+    disposers.push(off);
+    return off;
+  };
+
+  function boot(role) {
+    disposers.forEach(function (dispose) {
+      try { dispose(); } catch (err) { /* keep tearing down */ }
+    });
+    disposers = [];
+
+    booted = role;
     document.documentElement.lang = 'en';
     var markup = document.getElementById('bb-body-' + role);
     document.body.dataset.app = markup.dataset.app;
+    document.body.classList.remove('is-locked');
     document.getElementById('bb-root').innerHTML = markup.textContent;
     if (window.BB_MODULES[role]) window.BB_MODULES[role]();
+    window.scrollTo(0, 0);
   }
 
-  window.addEventListener('hashchange', function () {
-    if (currentRole() !== booted) location.reload();
+  /* Handle in-page links ourselves: if the host swallows fragment navigation,
+     the browser's default would do nothing at all. */
+  document.addEventListener('click', function (event) {
+    if (event.defaultPrevented || event.button) return;
+    var link = event.target.closest && event.target.closest('a[href^="#"]');
+    if (!link) return;
+    event.preventDefault();
+    UI.setHash(link.getAttribute('href'));
+    onHashChange();
   });
 
-  boot();
+  boot(roleFrom(UI.hash()));
 })();
 </script>

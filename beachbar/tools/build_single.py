@@ -122,30 +122,75 @@ def build(fragment=False):
                      % (role, source))
 
     parts.append('''<script>
-/* router: one role per page load — switching roles reloads, so every app boots
-   exactly like it does in the multi-page build */
+/* Router. Roles are swapped in place — never by reloading: in-app file viewers
+   and sandboxed previews block reloads, and a demo that dies on the first tap
+   is worse than useless. Each role's intervals, window listeners and store
+   subscriptions are tracked while it boots, so switching away disposes of them
+   and the next role starts as cleanly as it would on a fresh page. */
 (function () {
   var ROLES = %s;
-  function currentRole() {
-    var role = (location.hash || '').replace(/^#/, '').split(/[\\/?]/)[0];
+
+  function roleFrom(hash) {
+    var role = (hash || '').replace(/^#/, '').split(/[\\/?]/)[0];
     return ROLES.indexOf(role) >= 0 ? role : 'index';
   }
-  var booted = currentRole();
 
-  function boot() {
-    var role = booted;
+  var booted = null;
+  var disposers = [];
+
+  function onHashChange() {
+    var next = roleFrom(UI.hash());
+    if (next !== booted) boot(next);
+  }
+  window.addEventListener('hashchange', onHashChange);
+
+  // from here on, everything a role registers is disposable
+  var nativeSetInterval = window.setInterval;
+  window.setInterval = function (fn, ms) {
+    var id = nativeSetInterval(fn, ms);
+    disposers.push(function () { clearInterval(id); });
+    return id;
+  };
+  var nativeAddListener = window.addEventListener;
+  window.addEventListener = function (type, fn, options) {
+    nativeAddListener.call(window, type, fn, options);
+    disposers.push(function () { window.removeEventListener(type, fn, options); });
+  };
+  var nativeSubscribe = Store.subscribe;
+  Store.subscribe = function (fn) {
+    var off = nativeSubscribe(fn);
+    disposers.push(off);
+    return off;
+  };
+
+  function boot(role) {
+    disposers.forEach(function (dispose) {
+      try { dispose(); } catch (err) { /* keep tearing down */ }
+    });
+    disposers = [];
+
+    booted = role;
     document.documentElement.lang = 'en';
     var markup = document.getElementById('bb-body-' + role);
     document.body.dataset.app = markup.dataset.app;
+    document.body.classList.remove('is-locked');
     document.getElementById('bb-root').innerHTML = markup.textContent;
     if (window.BB_MODULES[role]) window.BB_MODULES[role]();
+    window.scrollTo(0, 0);
   }
 
-  window.addEventListener('hashchange', function () {
-    if (currentRole() !== booted) location.reload();
+  /* Handle in-page links ourselves: if the host swallows fragment navigation,
+     the browser's default would do nothing at all. */
+  document.addEventListener('click', function (event) {
+    if (event.defaultPrevented || event.button) return;
+    var link = event.target.closest && event.target.closest('a[href^="#"]');
+    if (!link) return;
+    event.preventDefault();
+    UI.setHash(link.getAttribute('href'));
+    onHashChange();
   });
 
-  boot();
+  boot(roleFrom(UI.hash()));
 })();
 </script>''' % repr([role for role, _, _ in ROLES]).replace("'", '"'))
 

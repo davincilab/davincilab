@@ -18,7 +18,7 @@
     return location.href.replace(/[^/]*$/, '').replace(/\/$/, '');
   }
 
-  var base = localStorage.getItem('bb.qrbase') || defaultBase();
+  var base = Store.storage.getItem('bb.qrbase') || defaultBase();
   var from = 1;
   var to = Store.settings.umbrellaCount;
 
@@ -86,7 +86,7 @@
             type: 'button', text: UI.lang() === 'el' ? 'Δημιουργία' : 'Generate',
             onclick: function () {
               base = baseInput.value.trim() || defaultBase();
-              localStorage.setItem('bb.qrbase', base);
+              Store.storage.setItem('bb.qrbase', base);
               from = Math.max(1, Number(fromInput.value) || 1);
               to = Math.max(from, Math.min(200, Number(toInput.value) || from));
               refreshGrid();

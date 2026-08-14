@@ -11,22 +11,48 @@
      multi-page  ?u=12            single-file  #guest?u=12                    */
   var SINGLE = !!global.BB_SINGLE_FILE;
 
+  /* Some hosts (in-app file viewers, sandboxed previews) refuse fragment
+     navigation. When we notice the address bar did not take our hash, we keep
+     it in memory instead and raise the event ourselves, so routing keeps
+     working wherever the file is opened. */
+  var virtualHash = null;
+
+  function hash() {
+    return virtualHash != null ? virtualHash : location.hash;
+  }
+
+  function setHash(next) {
+    if (virtualHash == null) {
+      try { location.hash = next; } catch (err) { /* blocked */ }
+      if (location.hash === next || location.hash === '#' + next.replace(/^#/, '')) return;
+    }
+    virtualHash = next;
+    var event;
+    try {
+      event = new HashChangeEvent('hashchange');
+    } catch (err) {
+      event = document.createEvent('Event');
+      event.initEvent('hashchange', false, false);
+    }
+    global.dispatchEvent(event);
+  }
+
   function roleName() {
-    return SINGLE ? (location.hash.replace(/^#/, '').split(/[/?]/)[0] || 'index') : '';
+    return SINGLE ? (hash().replace(/^#/, '').split(/[/?]/)[0] || 'index') : '';
   }
 
   /* the route inside the current app, without role prefix and query */
   function route() {
-    var hash = location.hash.replace(/^#/, '');
-    var query = hash.indexOf('?');
-    if (query >= 0) hash = hash.slice(0, query);
-    if (!SINGLE) return hash;
-    var slash = hash.indexOf('/');
-    return slash < 0 ? '' : hash.slice(slash + 1);
+    var h = hash().replace(/^#/, '');
+    var query = h.indexOf('?');
+    if (query >= 0) h = h.slice(0, query);
+    if (!SINGLE) return h;
+    var slash = h.indexOf('/');
+    return slash < 0 ? '' : h.slice(slash + 1);
   }
 
   function go(sub) {
-    location.hash = SINGLE ? '#' + roleName() + '/' + (sub || 'menu') : '#' + (sub || 'menu');
+    setHash(SINGLE ? '#' + roleName() + '/' + (sub || 'menu') : '#' + (sub || 'menu'));
   }
 
   function lang() { return Store.device.lang || 'en'; }
@@ -241,9 +267,9 @@
   function param(name) {
     var fromSearch = new URLSearchParams(location.search).get(name);
     if (fromSearch != null) return fromSearch;
-    var hash = location.hash || '';
-    var query = hash.indexOf('?');
-    return query < 0 ? null : new URLSearchParams(hash.slice(query + 1)).get(name);
+    var h = hash() || '';
+    var query = h.indexOf('?');
+    return query < 0 ? null : new URLSearchParams(h.slice(query + 1)).get(name);
   }
 
   function debounce(fn, wait) {
@@ -269,6 +295,7 @@
     toast: toast, sheet: sheet, confirmSheet: confirmSheet,
     langToggle: langToggle, applyLang: applyLang,
     beep: beep, param: param, debounce: debounce, escapeHtml: escapeHtml,
-    single: SINGLE, roleName: roleName, route: route, go: go
+    single: SINGLE, roleName: roleName, route: route, go: go,
+    hash: hash, setHash: setHash
   };
 })(typeof window !== 'undefined' ? window : globalThis);

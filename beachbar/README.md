@@ -170,3 +170,18 @@ beachbar/
 
 Bedienung: Touch-Ziele ≥ 44 px, Dunkelmodus, Tastaturfokus, Diagramme zusätzlich
 als Tabelle, Farbpalette auf Farbfehlsichtigkeit geprüft.
+
+---
+
+## Ein-Datei-Version (zum Verschicken / Hosten)
+
+```bash
+python3 tools/build_single.py              # dist/beachbar-demo.html
+python3 tools/build_single.py --fragment   # ohne <html>/<head>/<body>, für Hosts mit eigenem Gerüst
+```
+
+Alles inline (CSS, JS, Icons) — läuft vom USB-Stick, aus dem Mail-Anhang oder von
+jedem statischen Host. Die Seiten werden zu Rollen hinter dem Hash:
+`#index`, `#guest`, `#bar`, `#dashboard`, `#qr`; ein QR-Code zeigt dann auf
+`…/beachbar-demo.html#guest?u=12`. Rollenwechsel lädt die Seite neu, damit jede
+App exakt wie im Mehrseiten-Build startet.

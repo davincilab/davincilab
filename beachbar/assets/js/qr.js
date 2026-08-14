@@ -13,15 +13,19 @@
   var view = UI.$('#view');
 
   function defaultBase() {
-    var url = location.href.replace(/[^/]*$/, '');
-    return url.replace(/\/$/, '');
+    // single file: the page itself is the app; pages: the folder holding them
+    if (UI.single) return location.href.split('#')[0];
+    return location.href.replace(/[^/]*$/, '').replace(/\/$/, '');
   }
 
   var base = localStorage.getItem('bb.qrbase') || defaultBase();
   var from = 1;
   var to = Store.settings.umbrellaCount;
 
-  function urlFor(number) { return base.replace(/\/$/, '') + '/guest.html?u=' + number; }
+  function urlFor(number) {
+    if (UI.single) return base.split('#')[0] + '#guest?u=' + number;
+    return base.replace(/\/$/, '') + '/guest.html?u=' + number;
+  }
 
   function card(number) {
     var wrap = el('div.qr-card', {}, [

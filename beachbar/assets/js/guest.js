@@ -91,22 +91,22 @@
     ]);
     UI.$('#umbrellaBadge').onclick = askUmbrella;
     UI.mount(UI.$('#langHost'), [UI.langToggle(function () { renderShell(); render(); })]);
-    UI.$('#btnOrders').onclick = function () { location.hash = '#orders'; };
-    UI.$('#btnAccount').onclick = function () { location.hash = '#account'; };
-    UI.$('#cartBtn').onclick = function () { location.hash = '#cart'; };
+    UI.$('#btnOrders').onclick = function () { UI.go('orders'); };
+    UI.$('#btnAccount').onclick = function () { UI.go('account'); };
+    UI.$('#cartBtn').onclick = function () { UI.go('cart'); };
     renderCartBar();
   }
 
   function renderCartBar() {
     var count = cartCount();
-    var onMenu = (location.hash || '#menu').indexOf('#cart') !== 0;
+    var onMenu = UI.route() !== 'cart';
     cartbar.classList.toggle('is-visible', count > 0 && onMenu);
     UI.$('#cartCount').textContent = count + ' ' + (count === 1 ? t('item') : t('items'));
     UI.$('#cartSum').textContent = money(Store.cartTotal(cart));
   }
 
   function renderChips() {
-    var show = (location.hash || '#menu') === '#menu' || location.hash === '';
+    var show = UI.route() === '' || UI.route() === 'menu';
     chips.classList.toggle('hidden', !show);
     if (!show) return;
     var all = [{ id: 'all', icon: '🌴', name: { en: 'All', el: 'Όλα' } }].concat(DATA.CATEGORIES);
@@ -268,7 +268,7 @@
           el('h2', { text: t('emptyCart') }),
           el('p.muted', { text: t('emptyCartHint') }),
           el('button.btn.btn--primary', { type: 'button', text: t('menu'),
-            onclick: function () { location.hash = '#menu'; } })
+            onclick: function () { UI.go('menu'); } })
         ])
       ]);
       return;
@@ -326,7 +326,7 @@
       el('div.row.row--between', {}, [
         el('h1', { style: 'font-size:1.3rem', text: t('cart') }),
         el('button.link-btn', { type: 'button', text: '＋ ' + t('menu'),
-          onclick: function () { location.hash = '#menu'; } })
+          onclick: function () { UI.go('menu'); } })
       ]),
       lines,
       el('div.card', {}, [
@@ -415,9 +415,9 @@
       saveCart();
       draft = { note: '', music: '', payMode: null, wantsInvoice: null };
       if (options.wantsInvoice) {
-        openInvoiceSheet([order.id], order.total, function () { location.hash = '#order/' + order.id; });
+        openInvoiceSheet([order.id], order.total, function () { UI.go('order/' + order.id); });
       } else {
-        location.hash = '#order/' + order.id;
+        UI.go('order/' + order.id);
       }
       UI.toast(t('orderPlaced'), 'good');
     };
@@ -631,7 +631,7 @@
   function orderCard(order) {
     return el('button.card', {
       type: 'button', style: 'width:100%;text-align:left;cursor:pointer',
-      onclick: function () { location.hash = '#order/' + order.id; }
+      onclick: function () { UI.go('order/' + order.id); }
     }, [
       el('div.row.row--between', {}, [
         el('div.row', {}, [
@@ -655,7 +655,7 @@
 
   function viewOrderDetail(orderId) {
     var order = Store.getOrder(orderId);
-    if (!order) { location.hash = '#orders'; return; }
+    if (!order) { UI.go('orders'); return; }
 
     var steps = ['new', 'preparing', 'ready', 'served'];
     var currentIndex = steps.indexOf(order.status);
@@ -683,7 +683,7 @@
     UI.mount(view, [
       el('div.row.row--between', {}, [
         el('button.link-btn', { type: 'button', text: '← ' + t('yourOrders'),
-          onclick: function () { location.hash = '#orders'; } }),
+          onclick: function () { UI.go('orders'); } }),
         el('span.pill.pill--' + order.status, { text: UI.statusLabel(order.status) })
       ]),
       el('div.card', { style: 'margin-top:10px' }, [
@@ -799,13 +799,13 @@
   // --- router --------------------------------------------------------------
 
   function render() {
-    var hash = location.hash || '#menu';
+    var here = UI.route();
     renderChips();
     renderCartBar();
-    if (hash.indexOf('#order/') === 0) viewOrderDetail(hash.slice(7));
-    else if (hash === '#cart') viewCart();
-    else if (hash === '#orders') viewOrders();
-    else if (hash === '#account') viewAccount();
+    if (here.indexOf('order/') === 0) viewOrderDetail(here.slice(6));
+    else if (here === 'cart') viewCart();
+    else if (here === 'orders') viewOrders();
+    else if (here === 'account') viewAccount();
     else viewMenu();
     window.scrollTo({ top: 0, behavior: 'auto' });
   }
@@ -822,13 +822,13 @@
     Store.subscribe(function (state, reason) {
       // a status change from the bar should show up here immediately
       if (reason === 'order:status' || reason === 'payment' || reason === 'remote') {
-        var hash = location.hash || '#menu';
-        if (hash.indexOf('#order/') === 0 || hash === '#orders') render();
+        var here = UI.route();
+        if (here.indexOf('order/') === 0 || here === 'orders') render();
       }
     });
     // keep the ETA countdown fresh
     setInterval(function () {
-      if ((location.hash || '').indexOf('#order/') === 0) render();
+      if (UI.route().indexOf('order/') === 0) render();
     }, 30000);
   }
 

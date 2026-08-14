@@ -4,6 +4,31 @@
 (function (global) {
   'use strict';
 
+  /* The app ships two ways: as separate pages (guest.html, bar.html …) and as
+     one self-contained file for hosting/sharing. In single-file mode the first
+     hash segment names the role, so an app's own routes live behind it:
+     multi-page  #cart            single-file  #guest/cart
+     multi-page  ?u=12            single-file  #guest?u=12                    */
+  var SINGLE = !!global.BB_SINGLE_FILE;
+
+  function roleName() {
+    return SINGLE ? (location.hash.replace(/^#/, '').split(/[/?]/)[0] || 'index') : '';
+  }
+
+  /* the route inside the current app, without role prefix and query */
+  function route() {
+    var hash = location.hash.replace(/^#/, '');
+    var query = hash.indexOf('?');
+    if (query >= 0) hash = hash.slice(0, query);
+    if (!SINGLE) return hash;
+    var slash = hash.indexOf('/');
+    return slash < 0 ? '' : hash.slice(slash + 1);
+  }
+
+  function go(sub) {
+    location.hash = SINGLE ? '#' + roleName() + '/' + (sub || 'menu') : '#' + (sub || 'menu');
+  }
+
   function lang() { return Store.device.lang || 'en'; }
 
   function t(key) {
@@ -212,8 +237,13 @@
 
   // --- misc ----------------------------------------------------------------
 
+  /* ?u=12 works from the query string and from behind the hash alike */
   function param(name) {
-    return new URLSearchParams(location.search).get(name);
+    var fromSearch = new URLSearchParams(location.search).get(name);
+    if (fromSearch != null) return fromSearch;
+    var hash = location.hash || '';
+    var query = hash.indexOf('?');
+    return query < 0 ? null : new URLSearchParams(hash.slice(query + 1)).get(name);
   }
 
   function debounce(fn, wait) {
@@ -238,6 +268,7 @@
     timeAgo: timeAgo, clock: clock, statusLabel: statusLabel,
     toast: toast, sheet: sheet, confirmSheet: confirmSheet,
     langToggle: langToggle, applyLang: applyLang,
-    beep: beep, param: param, debounce: debounce, escapeHtml: escapeHtml
+    beep: beep, param: param, debounce: debounce, escapeHtml: escapeHtml,
+    single: SINGLE, roleName: roleName, route: route, go: go
   };
 })(typeof window !== 'undefined' ? window : globalThis);

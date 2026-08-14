@@ -19,3 +19,8 @@ Read more at https://makecode.microbit.org/extensions
 * for PXT/microbit
 (The metadata above is needed for package search.)
 
+
+## Beach bar ordering prototype
+
+QR based ordering system for a beach bar — guest app, bar station, dashboard and
+printable umbrella QR codes. See [`beachbar/README.md`](beachbar/README.md).

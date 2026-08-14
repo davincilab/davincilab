@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Beach Bar ordering — prototype</title>
+<meta name="description" content="Prototype of a QR based ordering system for a beach bar.">
+<meta name="theme-color" content="#2a78d6">
+<link rel="icon" href="assets/icons/icon-guest-32.png" sizes="32x32">
+<link rel="apple-touch-icon" href="assets/icons/icon-guest-180.png">
+<link rel="stylesheet" href="assets/css/app.css">
+</head>
+<body data-app="guest">
+<div class="launcher">
+  <div class="hero">
+    <h1 class="hero__title">⛱️ Beach Bar — ordering prototype</h1>
+    <p class="hero__sub">
+      Guests scan the QR code on their umbrella, order from the sunbed, pay with a
+      stored card and get the receipt by e-mail. The bar sees every ticket live.
+      Everything runs offline in the browser — no server, no real payments.
+    </p>
+  </div>
+
+  <div class="role-grid">
+    <a class="role" href="guest.html">
+      <img src="assets/icons/icon-guest-192.png" alt="">
+      <span>
+        <span class="role__name">Guest app (blue)</span>
+        <span class="role__desc">Menu, options, cart, payment, order tracking, music requests.
+          Add to home screen → blue icon.</span>
+      </span>
+    </a>
+    <a class="role" href="bar.html">
+      <img src="assets/icons/icon-bar-192.png" alt="">
+      <span>
+        <span class="role__name">Bar station (red)</span>
+        <span class="role__desc">Live tickets, preparation, delivery, manual orders, music.
+          Add to home screen → red icon.</span>
+      </span>
+    </a>
+    <a class="role" href="dashboard.html">
+      <img src="assets/icons/icon-bar-192.png" alt="">
+      <span>
+        <span class="role__name">Dashboard</span>
+        <span class="role__desc">Revenue, orders, top products, prep times, umbrella map, CSV export.</span>
+      </span>
+    </a>
+    <a class="role" href="qr.html">
+      <img src="assets/icons/icon-guest-192.png" alt="">
+      <span>
+        <span class="role__name">QR codes</span>
+        <span class="role__desc">Printable labels, one numbered code per umbrella.</span>
+      </span>
+    </a>
+  </div>
+
+  <div class="card" style="margin-top:22px">
+    <h2 class="card__title">Try the whole flow</h2>
+    <ol class="muted" style="margin:10px 0 0 18px;padding:0;line-height:1.8">
+      <li>Open <a href="qr.html">QR codes</a>, set the base URL to the address your phone can reach, print or scan from the screen.</li>
+      <li>Scan umbrella&nbsp;12 → the <a href="guest.html?u=12">guest app</a> opens for that umbrella.</li>
+      <li>Order a Freddo Espresso with little sugar, pay with the stored card, request a song.</li>
+      <li>Open the <a href="bar.html">bar station</a> in a second window — the ticket is already there.</li>
+      <li>Accept → ready → delivered; the guest sees each step live.</li>
+      <li>Check the <a href="dashboard.html">dashboard</a> for revenue, top products and open tabs.</li>
+    </ol>
+  </div>
+
+  <p class="small muted center" style="margin-top:24px">
+    Prototype — no real payment is processed, invoices are simulated.
+  </p>
+</div>
+</body>
+</html>

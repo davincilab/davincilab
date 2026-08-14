@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Beach Bar — Dashboard</title>
+<meta name="description" content="Live numbers of the beach bar: revenue, orders, products, umbrellas.">
+<link rel="manifest" href="manifest-bar.webmanifest">
+<meta name="theme-color" content="#d4403f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Bar">
+<link rel="apple-touch-icon" href="assets/icons/icon-bar-180.png">
+<link rel="icon" href="assets/icons/icon-bar-32.png" sizes="32x32">
+<link rel="stylesheet" href="assets/css/app.css">
+</head>
+<body data-app="bar">
+<div class="app">
+  <header class="topbar">
+    <a class="icon-btn" href="bar.html" aria-label="Bar station" style="text-decoration:none">←</a>
+    <div style="flex:1;min-width:0">
+      <div class="topbar__title" id="barName">Dashboard</div>
+      <div class="topbar__sub" id="topSub"></div>
+    </div>
+    <div id="langHost"></div>
+  </header>
+  <main class="main main--wide" id="view"></main>
+</div>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/store.js"></script>
+<script src="assets/js/ui.js"></script>
+<script src="assets/js/dashboard.js"></script>
+</body>
+</html>

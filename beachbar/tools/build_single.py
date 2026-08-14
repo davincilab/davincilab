@@ -27,7 +27,7 @@ OUT = os.path.join(OUT_DIR, 'beachbar-demo.html')
 SHARED_JS = ['data.js', 'store.js', 'ui.js', 'qrcode.js']
 ROLES = [
     # role,        page,              module js
-    ('index', 'index.html', None),
+    ('index', 'index.html', 'diag.js'),
     ('guest', 'guest.html', 'guest.js'),
     ('bar', 'bar.html', 'bar.js'),
     ('dashboard', 'dashboard.html', 'dashboard.js'),

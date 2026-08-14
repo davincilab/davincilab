@@ -169,6 +169,156 @@
     if (document.body) document.body.classList.toggle('is-flowhost', isFlowHost());
   }
 
+  /* Last line of defence. Some hosts neither scroll the page nor let the page
+     scroll itself (an injected overflow:hidden, a web view sized to one screen
+     that never re-measures). Taps still arrive, so we can move the content
+     ourselves. Enabled only after proving the window refuses to scroll while
+     content sticks out below — a normal browser never reaches this. */
+  var dragScroll = null;
+
+  /* Careful: this only says the window can be scrolled *by script*. A host that
+     pins the viewport with overflow:hidden still answers yes here while the
+     user's finger achieves nothing — which is why the real detection below
+     watches actual gestures instead. */
+  function canScrollWindow() {
+    var before = global.scrollY;
+    global.scrollTo(0, before + 40);
+    var moved = Math.abs(global.scrollY - before) > 1;
+    global.scrollTo(0, before);
+    return moved;
+  }
+
+  function contentOverflows() {
+    return Math.max(document.documentElement.scrollHeight, document.body.scrollHeight)
+      > global.innerHeight + 24;
+  }
+
+  function viewportPinned() {
+    var root = getComputedStyle(document.documentElement).overflowY;
+    var body = getComputedStyle(document.body).overflowY;
+    return root === 'hidden' || (body === 'hidden' && !document.body.classList.contains('is-locked'));
+  }
+
+  function probeScrolling() {
+    if (dragScroll || isFlowHost()) return;
+    if (contentOverflows() && viewportPinned()) enableDragScroll();
+  }
+
+  /* The decisive test: the user drags, and nothing moves. No assumption about
+     the host required — if a real gesture fails to scroll anything, we take
+     over scrolling ourselves from then on. */
+  function scrollableAncestor(node) {
+    while (node && node !== document.body && node.nodeType === 1) {
+      var style = getComputedStyle(node);
+      if (/(auto|scroll)/.test(style.overflowY) && node.scrollHeight > node.clientHeight + 4) {
+        return node;
+      }
+      node = node.parentElement;
+    }
+    return null;
+  }
+
+  function watchGestures() {
+    var startY = 0, startScroll = 0, inner = null, innerTop = 0;
+    var strikes = 0;   // two failed gestures in a row before we take over
+
+    document.addEventListener('touchstart', function (event) {
+      if (dragScroll || event.touches.length !== 1) return;
+      startY = event.touches[0].clientY;
+      startScroll = global.scrollY;
+      inner = scrollableAncestor(event.target);
+      innerTop = inner ? inner.scrollTop : 0;
+    }, { passive: true });
+
+    document.addEventListener('touchend', function (event) {
+      if (dragScroll || isFlowHost() || !contentOverflows()) return;
+      var touch = (event.changedTouches && event.changedTouches[0]) || null;
+      if (!touch) return;
+
+      var delta = startY - touch.clientY;               // > 0 means "show me what's below"
+      if (Math.abs(delta) < 30) return;                 // a tap, not a scroll
+
+      /* Was there anywhere to go? At the very top a downward pull moves
+         nothing in any browser — that is not a broken host. */
+      var room = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight)
+        - global.innerHeight;
+      if (delta > 0 && startScroll >= room - 2) return;
+      if (delta < 0 && startScroll <= 2) return;
+
+      if (Math.abs(global.scrollY - startScroll) > 2 ||
+          (inner && Math.abs(inner.scrollTop - innerTop) > 2)) {
+        strikes = 0;                                    // something moved: all good
+        return;
+      }
+
+      if (++strikes < 2) return;
+      enableDragScroll();
+      toast(lang() === 'el' ? 'Κύλιση ενεργή — σύρετε με το δάχτυλο'
+                            : 'Scrolling enabled — drag with your finger', 'good');
+    }, { passive: true });
+  }
+
+  function enableDragScroll() {
+    if (dragScroll) return;
+    dragScroll = { offset: 0 };
+    document.body.classList.add('is-dragscroll', 'is-flowhost');
+
+    function surface() {
+      return document.querySelector('.sheet-backdrop') ||
+             document.querySelector('.app') ||
+             document.body.firstElementChild;
+    }
+
+    function limit(node) {
+      return Math.max(0, node.scrollHeight - global.innerHeight + 24);
+    }
+
+    function place(node, value) {
+      dragScroll.offset = Math.min(Math.max(0, value), limit(node));
+      node.style.position = 'relative';
+      node.style.top = (-dragScroll.offset) + 'px';
+    }
+
+    var startY = 0, startOffset = 0, tracking = false;
+
+    document.addEventListener('touchstart', function (event) {
+      if (event.touches.length !== 1) return;
+      tracking = true;
+      startY = event.touches[0].clientY;
+      startOffset = dragScroll.offset;
+    }, { passive: true });
+
+    document.addEventListener('touchmove', function (event) {
+      if (!tracking) return;
+      var delta = startY - event.touches[0].clientY;
+      if (Math.abs(delta) < 4) return;
+      place(surface(), startOffset + delta);
+      if (event.cancelable) event.preventDefault();
+    }, { passive: false });
+
+    document.addEventListener('touchend', function () { tracking = false; }, { passive: true });
+
+    document.addEventListener('wheel', function (event) {
+      place(surface(), dragScroll.offset + event.deltaY);
+      if (event.cancelable) event.preventDefault();
+    }, { passive: false });
+
+    /* a fresh view starts at the top again */
+    dragScroll.reset = function () {
+      var node = surface();
+      if (node) { dragScroll.offset = 0; node.style.top = '0px'; }
+    };
+  }
+
+  function resetScroll() {
+    if (dragScroll && dragScroll.reset) dragScroll.reset();
+    else global.scrollTo(0, 0);
+  }
+
+  function scrollMode() {
+    return dragScroll ? 'drag' : (isFlowHost() ? 'host' : 'window');
+  }
+
   // --- toast ---------------------------------------------------------------
 
   var toastHost = null;
@@ -186,7 +336,7 @@
   // --- sheet / modal -------------------------------------------------------
 
   function sheet(options) {
-    var inline = isFlowHost();
+    var inline = isFlowHost() || scrollMode() === 'drag';
     var backdrop = el('div.sheet-backdrop' + (inline ? '.sheet-backdrop--inline' : ''));
     var panel = el('div.sheet' + (options.wide ? '.sheet--wide' : ''), {
       role: 'dialog', 'aria-modal': 'true', 'aria-label': options.title || ''
@@ -215,7 +365,7 @@
     if (inline) {
       if (app) app.style.display = 'none';
       backdrop.classList.add('is-open');
-      global.scrollTo(0, 0);
+      resetScroll();
     } else {
       document.body.classList.add('is-locked');
       requestAnimationFrame(function () { backdrop.classList.add('is-open'); });
@@ -226,7 +376,7 @@
       document.removeEventListener('keydown', onKey);
       backdrop.classList.remove('is-open');
       document.body.classList.remove('is-locked');
-      if (inline && app) app.style.display = '';
+      if (inline && app) { app.style.display = ''; resetScroll(); }
       setTimeout(function () { backdrop.remove(); }, inline ? 0 : 200);
       if (options.onClose) options.onClose();
     }
@@ -275,9 +425,12 @@
   }
 
   // the frame is sized after content renders, so re-check when it changes
-  global.addEventListener('resize', markHost);
-  setTimeout(markHost, 400);
-  setTimeout(markHost, 1500);
+  function checkHost() { markHost(); probeScrolling(); }
+  watchGestures();
+  global.addEventListener('resize', checkHost);
+  setTimeout(checkHost, 400);
+  setTimeout(checkHost, 1200);
+  setTimeout(checkHost, 2500);
 
   // --- sound (bar station) -------------------------------------------------
 
@@ -338,6 +491,9 @@
     langToggle: langToggle, applyLang: applyLang,
     beep: beep, param: param, debounce: debounce, escapeHtml: escapeHtml,
     single: SINGLE, roleName: roleName, route: route, go: go,
-    hash: hash, setHash: setHash, isFlowHost: isFlowHost, markHost: markHost
+    hash: hash, setHash: setHash, isFlowHost: isFlowHost, markHost: markHost,
+    probeScrolling: probeScrolling, resetScroll: resetScroll, scrollMode: scrollMode,
+    forceDragScroll: enableDragScroll,
+    canScrollWindow: canScrollWindow
   };
 })(typeof window !== 'undefined' ? window : globalThis);
